@@ -2,7 +2,7 @@
 
 We present Matlab code to reproduce all analyses and figures from the paper "Risk averse reproduction numbers improve resurgence detection" by Kris V Parag and Uri Obolski. This paper is available in preprint form at:
 
-We also present a version in R which users can modify easily to apply to custom datasets. This example includes an update of EpiFilter to compute E. This can be found in the folder R version. The main function empiricalEandR.R is setup to reproduce part of Fig 5.
+We also present a function in R which users can easily modify to apply to custom datasets. This can be found in the folder R version and includes an update of EpiFilter to compute E. The main function empiricalEandR.R is setup to reproduce part of a COVID-19 case study in Israel.
 
 This work focuses on designing new consensus statistics for describing transmissibility at larger scales where homogeneous mixing assumptions are likely invalid. We assume that incidence curves at the local scale (e.g., regions composing a country) are available and that homogeneous mixing is valid at this scale. We estimate local reproduction numbers from each incidence curve i.e., Rj for local group j with 1 <= j <= p groups. We then combine these to derive three statistics: R, D and E. These measure transmissibility at te global scale (e.g., countrywide).
 
