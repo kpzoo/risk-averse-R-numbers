@@ -24,7 +24,7 @@ cd(thisDir); addpath(genpath(mainDir));
 % Define number of days to simulate
 nday0 = 301; tday0 = 1:nday0;
 % Defined cases for figures
-figNo = 4; distNo = 2;
+figNo = 3; distNo = 2;
 switch(figNo)
     case 3
         % Step change resurgence
@@ -48,7 +48,7 @@ for i = 1:nDeme
     % Simulate epidemic scenarios and truncate
     while Iwarn
         [Ideme{i}, Ldeme{i}, Rtrue{i}, tday, Iwarn, distvals] = ...
-            epiSimScenDeme(scenNos(i), nday0, distNo, simVals);
+            epiSimScenDemeRand(scenNos(i), nday0, distNo, simVals);
     end
     if Iwarn
         warning('Sequences of zero incidence');
@@ -68,6 +68,12 @@ Rtrue = cell2mat(Rtrue'); Ravg = mean(Rtrue, 1);
 % Aggregate the epidemics and also Lam as serial interval fixed
 Itot = sum(Ideme, 1); Ltot = sum(Ldeme, 1);
 
+% Starting times for when combining distributions
+istarts = zeros(1, nDeme);
+for i = 1:nDeme
+    istarts(i) = find(Ideme(i, :) > 0, 1, 'first');
+end
+
 %% Estimate transmission among epidemics in demes
 
 % Grid limits and noise level
@@ -84,6 +90,8 @@ for i = 1:nDeme
     % EpiFilter estimate from each deme
     [~, ~, ~, ~, pR, pRup, pstate] = runEpiFilter(Rgrid, m, eta, nday, p0, Ldeme(i, :), Ideme(i, :));
     [~, Rl(i, :), Rh(i, :), Rm(i, :), qR{i}] = runEpiSmoother(Rgrid, m, nday, pR, pRup, pstate);
+
+    %qR{i} = pR;
     
     disp(['Completed deme ' num2str(i) ' of ' num2str(nDeme)]);
 end
@@ -92,20 +100,27 @@ end
 [~, ~, ~, ~, pRL, pRupL, pstateL] = runEpiFilter(Rgrid, m, eta, nday, p0, Ltot, Itot);
 [~, RLaml, RLamh, RLam, qRLam] = runEpiSmoother(Rgrid, m, nday, pRL, pRupL, pstateL);
 
+%[~, RLaml, RLamh, RLam, qRLam, pRupL, pstateL] = runEpiFilter(Rgrid, m, eta, nday, p0, Ltot, Itot);
+
 % Basic D and E optimal design means (no CIs)
 Re_D = mean(Rm); Re_E = mean(Rm.^2)./Re_D;
 
 % D and E optimal distribution by sampling
-nsamps = 10000; RmD = zeros(1, nday); RlD = RmD; RhD = RmD;
-RmE = RmD; RlE = RmD; RhE = RmD;
+nsamps = 50000; RmD = zeros(1, nday); RlD = RmD; RhD = RmD; RmE = RmD; 
+RlE = RmD; RhE = RmD; Rhmaxj = RmD; Rlmaxj = RmD; Rmmaxj = RmD;
+
 for i = 1:nday
     % Individual distribution samples
     xDeme = zeros(nDeme, nsamps);
     for j = 1:nDeme
-        xDeme(j, :) = datasample(Rgrid, nsamps, 'Weights', qR{j}(i, :));
+        if i >= istarts(j)
+            xDeme(j, :) = datasample(Rgrid, nsamps, 'Weights', qR{j}(i-istarts(j)+1, :));
+        end
     end
     % D and E optimal samples for this day
     Dsamp = mean(xDeme); Esamp = mean(xDeme.^2)./Dsamp;
+    % Sample maximum across demes
+    Rjmaxsamp = max(xDeme);
 
     % Statistics of D designs
     RmD(i) = mean(Dsamp); 
@@ -116,6 +131,11 @@ for i = 1:nday
     RmE(i) = mean(Esamp);
     Equants = quantile(Esamp, [0.025, 0.975]);
     RlE(i) = Equants(1); RhE(i) = Equants(2);
+
+    % Statistics of max of Rj metric
+    Rmmaxj(i) = mean(Rjmaxsamp);
+    Rjmaxquants = quantile(Rjmaxsamp, [0.025, 0.975]);
+    Rlmaxj(i) = Rjmaxquants(1); Rhmaxj(i) = Rjmaxquants(2);
 end
 
 %% Publishable figures
@@ -143,13 +163,16 @@ yyaxis('right');
 stairs(tday, Itot, 'Color', cmap(4, :), 'LineWidth', 2);
 h = gca; h.YColor = h.XColor;
 yyaxis('left');
-plotCIRaw(tday', RmD', RlD', RhD', 'g');
+plotCIRaw(tday', Rmmaxj', Rlmaxj', Rhmaxj', 'c');
 hold on; h = gca; h.YColor = h.XColor;
+plotCIRaw(tday', RmD', RlD', RhD', 'g');
 plotCIRaw(tday', RLam', RLaml', RLamh', 'b');
 plotCIRaw(tday', RmE', RlE', RhE', 'r');
 plot(tday, ones(1, nday), '--', 'Color', 'k', 'LineWidth', 1);
 grid off; box off; hold off;
-ylabel('$\hat{R}(t), \hat{D}(t), \hat{E}(t)$', 'FontSize', fnt);
+ylabel('global $\hat{X}(t)$', 'FontSize', fnt);
+legend('', '$\max \hat{R}_j(t)$', '', '$\hat{D}(t)$', '', '$\hat{R}(t)$',...
+    '', '$\hat{E}(t)$');
 xlabel('$t$ (days)', 'FontSize', fnt);
 xlim([tday(2) tday(end)]); linkaxes(ax1, 'y'); 
 

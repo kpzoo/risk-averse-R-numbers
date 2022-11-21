@@ -2,6 +2,7 @@
 clearvars; clc; close all; tic;
 
 % Assumptions and notes
+% - adds time slices across June and July to test resurgence
 % - includes max of Rj as another metric
 % - accounts for different starting times
 % - optimal designs achieved by sampling from qR distributions
@@ -182,78 +183,6 @@ end
 tdelday = Idelday(Idelday <= 0.95); tdel = tday(Idelday <= 0.95);
 Idelday = Idelday(Idelday <= 0.95);
 
-
-%% Publishable figure with variant
-
-% Peak sizes of epidemics
-figure('Renderer', 'painters', 'Position', [10 10 800 1000]);
-subplot(4, 1, 1);
-plot(tdate', Ideme', 'LineWidth', 2);
-hold on;
-plot(tdate', Itot', 'k', 'LineWidth', 2);
-grid off; box off; hold off;
-h = gca; h.YScale = 'log';
-ylabel('$I_j(t)$', 'FontSize', fnt);
-xlim([tdate(8) tdate(end)+1]);
-
-% Get ticks for middle panel
-xt = h.XTick; xtlab = h.XTickLabel;
-% Find time points of ticks 
-tt = zeros(size(xt));
-for i = 1:length(xt)-1
-    tt(i) = find(tdate == xt(i));
-end
-tt(length(xt)) = tday(end)+1;
-
-% Key times of interest
-tvac1 = xt(4)-2; tvac2 = xt(5)-3;
-ttvac1 = tt(4)-2; ttvac2 = tt(5)-3;
-h = gca; hold on;
-plot([tvac1 tvac1], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-plot([tvac2 tvac2], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-hold off;
-
-subplot(4, 1, [2 3]);
-hold on;
-plotCIRaw(tday', RLam', RLaml', RLamh', 'b');
-plotCIRaw(tday', RmD', RlD', RhD', 'g');
-plotCIRaw(tday', RmE', RlE', RhE', 'r');
-plot(tday, ones(1, nday), '--', 'Color', 'k', 'LineWidth', 1);
-% Addition of variant proportion
-stairs(tdel, 3*Idelday, 'LineWidth', 2);
-% Vaccination period
-h = gca; 
-plot([ttvac1 ttvac1], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-plot([ttvac2 ttvac2], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-grid off; box off; hold off;
-h = gca; h.YScale = 'linear'; h.YColor = h.XColor;
-h.XTick = tt; h.XTickLabel = xtlab;
-legend('', '$\hat{R}(t)$', '', '$\hat{D}(t)$', '', '$\hat{E}(t)$', 'Location','best');
-legend('boxoff');
-ylabel('$\hat{X}(t)$', 'FontSize', fnt);
-xlim([tday(8) tday(end)+1]); ylim([0 3]);
-
-subplot(4, 1, 4);
-hold on; 
-plot(tdate, p1R, '-', 'color', 'b', 'LineWidth', 2);
-plot(tdate, p1D, '-', 'color', 'g', 'linewidth', 2);
-plot(tdate, p1E, '-', 'color', 'r', 'LineWidth', 2);
-h = gca;
-plot([tvac1 tvac1], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-plot([tvac2 tvac2], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
-plot(tdate, 0.5*ones(1, nday), '--', 'color', 'k', 'LineWidth', 1);
-h = gca; h.YColor = h.XColor;
-grid off; box off; hold off;
-xlim([tdate(8) tdate(end)+1]); ylim([0 1.05]);
-ylabel('P($\hat{X}(t) > 1$)', 'FontSize', fnt);
-xlabel('$t$ (days)', 'FontSize', fnt);
-
-if saveFig
-    cd(saveFol);
-    saveas(gcf, 'Fig5v', 'fig');
-    cd(thisDir);
-end
-
 %% Publishable figure with max of Rj instead of D
 
 % Peak sizes of epidemics
@@ -328,11 +257,6 @@ if saveFig
     cd(thisDir);
 end
 
-
-% Timing and data saving
-tsim = toc/60;
-disp(['Run time = ' num2str(tsim)]);
-
 % Remove unneeded variables and save
 if saveTrue
     % Variables to save
@@ -343,3 +267,73 @@ if saveTrue
     save(['israel_' num2str(nDeme)  '_data' '.mat'], varNam{:});
     cd(thisDir);
 end
+
+
+%% Run 3 slices to test prospective performance
+
+% Define slices across June and July
+slices = {'2021-06-10', '2021-06-20', '2021-06-30', '2021-08-01'}; nSlice = length(slices);
+% Slice estimate variables
+
+
+figure('Renderer', 'painters', 'Position', [10 10 800 1000]);
+% For each slice truncate time series and estimate
+for j = 1:nSlice
+
+    % ID in time series to truncate 
+    ndaySlice = find(tdate == datetime(slices{j})); tdaySlice = 1:ndaySlice;
+    % Truncate demes and remove those that have not started
+    IdemeSlice = Ideme(istarts < ndaySlice, tdaySlice); 
+    LdemeSlice = Ldeme(istarts < ndaySlice, tdaySlice);
+    nDemeSlice = size(IdemeSlice, 1); iSlice = istarts(istarts < ndaySlice);
+    ndaysSlice = ndaySlice-istarts(istarts < ndaySlice)+1;
+    ItotSlice = sum(IdemeSlice, 1); LtotSlice = sum(LdemeSlice, 1);
+
+    [Rmmaxj, Rlmaxj, Rhmaxj, RLam, RLaml, RLamh, RmD, RlD, RhD, RmE, RlE, RhE,...
+        p1Rjmax, p1R, p1D, p1E]= timeSlice(nDemeSlice, LdemeSlice, IdemeSlice,...
+        LtotSlice, ItotSlice, ndaySlice, ndaysSlice, iSlice);
+
+    % Plot of estimates up to slice time
+    subplot(nSlice, 2, 2*j-1);
+    hold on;
+    plotCIRaw(tdaySlice', RLam', RLaml', RLamh', 'b');
+    plotCIRaw(tdaySlice', RmE', RlE', RhE', 'r');
+    plot(tdaySlice, ones(1, ndaySlice), '--', 'Color', 'k', 'LineWidth', 1);
+    % Addition of variant proportion
+    stairs(tdel, 3*Idelday, 'k-.', 'LineWidth', 2);
+    % Vaccination period
+    h = gca;
+    plot([ttvac1 ttvac1], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
+    grid off; box off; hold off;
+    h = gca; h.YScale = 'linear'; h.YColor = h.XColor;
+    h.XTick = tt; h.XTickLabel = xtlab;
+    ylabel('$\hat{X}(t)$', 'FontSize', fnt);
+    xlim([tdaySlice(8) tdaySlice(end)+1]); ylim([0 3]);
+
+    % Plot of p(R > 1) type metrice to slice time
+    subplot(nSlice, 2, 2*j);
+    hold on;
+    plot(tdaySlice', p1R', 'b', 'LineWidth', 2);
+    plot(tdaySlice', p1E', 'r', 'LineWidth', 2);
+    plot(tdaySlice, 0.5*ones(1, ndaySlice), '--', 'Color', 'k', 'LineWidth', 1);
+    % Addition of variant proportion
+    stairs(tdel, Idelday, 'k-.', 'LineWidth', 2);
+    % Vaccination period
+    h = gca;
+    plot([ttvac1 ttvac1], h.YLim, '--', 'Color', grey1, 'LineWidth', 1);
+    grid off; box off; hold off;
+    h = gca; h.YScale = 'linear'; h.YColor = h.XColor;
+    h.XTick = tt; h.XTickLabel = xtlab;
+    if j == nSlice
+        legend('$\hat{R}(t)$', '$\hat{E}(t)$');
+        legend('boxoff');
+    end
+    ylabel('P($\hat{X}(t) > 1$)', 'FontSize', fnt);
+    xlim([tdaySlice(8) tdaySlice(end)+1]); ylim([0 1.1]);
+
+end
+
+
+% Timing and data saving
+tsim = toc/60;
+disp(['Run time = ' num2str(tsim)]);
