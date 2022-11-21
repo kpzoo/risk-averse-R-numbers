@@ -1,6 +1,6 @@
 # risk-averse-R-numbers
 
-We present Matlab code to reproduce all analyses and figures from the paper "Risk averse reproduction numbers improve resurgence detection" by Kris V Parag and Uri Obolski. This paper is available in preprint form at:
+We present Matlab code to reproduce all analyses and figures from the paper "Risk averse reproduction numbers improve resurgence detection" by Kris V Parag and Uri Obolski. This paper is available in preprint form at: https://www.medrxiv.org/content/10.1101/2022.08.31.22279450v1 
 
 We also present a function in R which users can easily modify to apply to custom datasets. This can be found in the folder R version and includes an update of EpiFilter to compute E. The main function empiricalEandR.R is setup to reproduce part of a COVID-19 case study in Israel.
 
